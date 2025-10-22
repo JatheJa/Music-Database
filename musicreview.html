@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>New Review</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{font-family:Arial, sans-serif; max-width:720px; margin:32px auto}
+    .uploader {
+      border: 2px dashed #bbb; border-radius: 10px; padding: 18px;
+      display:flex; align-items:center; gap:12px; background:#fafafa; cursor: pointer;
+    }
+    .uploader.dragover { border-color:#0d6efd; background:#eef5ff; }
+    .uploader img { width:80px; height:80px; object-fit:cover; border-radius:8px; background:#eee; display:none; }
+    .uploader .meta { font-size:14px; color:#444; }
+    .uploader input[type=file]{ display:none; }
+    label { font-weight:600; }
+  </style>
+</head>
+<body>
+  <h1>Write a Review</h1>
+  <form id="reviewForm">
+    <label>Artist ID (slug/code used by your pages) <br/><input name="artistId" required></label><br/><br/>
+    <label>Artist Name <br/><input name="artistName" required></label><br/><br/>
+    <label>Artist Description <br/><textarea name="artistDescription"></textarea></label><br/><br/>
+
+    <label>Artist Picture</label>
+    <div class="uploader" id="artistPicDrop">
+      <img id="artistPicPreview" alt="Preview">
+      <div class="meta">
+        <div><strong>Drag & drop</strong> an image here or <u>click to choose</u>.</div>
+        <div>PNG / JPG / GIF / WEBP up to 5MB.</div>
+      </div>
+      <input type="file" id="artistPicFile" accept="image/*">
+    </div>
+    <input type="hidden" name="artistPicture" id="artistPicUrl">
+    <br/>
+
+    <label>Album Title <br/><input name="albumTitle"></label><br/><br/>
+    <label>Track Title <br/><input name="trackTitle" required></label><br/><br/>
+    <label>Track Length (mm:ss) <br/><input name="trackLength"></label><br/><br/>
+
+    <label>Track/Album Artwork</label>
+    <div class="uploader" id="trackArtDrop">
+      <img id="trackArtPreview" alt="Preview">
+      <div class="meta">
+        <div><strong>Drag & drop</strong> an image here or <u>click to choose</u>.</div>
+        <div>PNG / JPG / GIF / WEBP up to 5MB.</div>
+      </div>
+      <input type="file" id="trackArtFile" accept="image/*">
+    </div>
+    <input type="hidden" name="trackArtwork" id="trackArtUrl">
+    <br/>
+
+    <label>Review Title <br/><input name="reviewTitle" required></label><br/><br/>
+    <label>Review Description <br/><textarea name="reviewDescription" required></textarea></label><br/><br/>
+    <label>Stars (1-5) <br/><input type="number" name="starRating" value="5" min="1" max="5" required></label><br/><br/>
+    <button type="submit">Submit Review</button>
+  </form>
+  <p><a href="selectreview.html">Back</a></p>
+
+  <script>
+    async function me(){
+      const r = await fetch("/me", { credentials:"include" });
+      return r.json();
+    }
+    async function postJSON(path, body){
+      const r = await fetch(path, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        credentials: "include",
+        body: JSON.stringify(body)
+      });
+      if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.error||"error"); }
+      return r.json();
+    }
+    async function uploadImage(file){
+      const fd = new FormData();
+      fd.append("image", file);
+      const r = await fetch("/upload-image", { method:"POST", body: fd, credentials:"include" });
+      if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.error||"upload failed"); }
+      return r.json();
+    }
+
+    function wireUploader(dropEl, fileInput, previewImg, hiddenUrlInput){
+      const pick = () => fileInput.click();
+      dropEl.addEventListener("click", (e)=>{ if(e.target !== fileInput) pick(); });
+      ["dragenter","dragover"].forEach(ev=> dropEl.addEventListener(ev, (e)=>{ e.preventDefault(); dropEl.classList.add("dragover"); }));
+      ["dragleave","drop"].forEach(ev=> dropEl.addEventListener(ev, (e)=>{ e.preventDefault(); dropEl.classList.remove("dragover"); }));
+      dropEl.addEventListener("drop", async (e)=>{
+        const file = e.dataTransfer.files?.[0];
+        if(!file) return;
+        await handleFile(file);
+      });
+      fileInput.addEventListener("change", async ()=>{
+        const file = fileInput.files?.[0];
+        if(!file) return;
+        await handleFile(file);
+      });
+      async function handleFile(file){
+        try{
+          const { url } = await uploadImage(file);
+          const reader = new FileReader();
+          reader.onload = () => { previewImg.src = reader.result; previewImg.style.display = "block"; };
+          reader.readAsDataURL(file);
+          hiddenUrlInput.value = url;
+        }catch(err){ alert(err.message); }
+      }
+    }
+
+    (async ()=>{
+      const user = await me();
+      if(!user){
+        alert("Login required to post a review.");
+        window.location.href = "login.html";
+        return;
+      }
+      wireUploader(
+        document.getElementById("artistPicDrop"),
+        document.getElementById("artistPicFile"),
+        document.getElementById("artistPicPreview"),
+        document.getElementById("artistPicUrl")
+      );
+      wireUploader(
+        document.getElementById("trackArtDrop"),
+        document.getElementById("trackArtFile"),
+        document.getElementById("trackArtPreview"),
+        document.getElementById("trackArtUrl")
+      );
+    })();
+
+    document.getElementById("reviewForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      try{
+        const created = await postJSON("/reviews", body);
+        alert("Review posted!");
+        window.location.href = `view_reviews.html?artistId=${encodeURIComponent(created.artist_id)}`;
+      }catch(err){ alert(err.message); }
+    });
+  </script>
+</body>
+</html>

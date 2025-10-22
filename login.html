@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>body{font-family:Arial, sans-serif; max-width:460px; margin:40px auto}</style>
+</head>
+<body>
+  <h1>Login</h1>
+  <form id="loginForm">
+    <label>Username<br/><input name="username" required></label><br/><br/>
+    <label>Password<br/><input name="password" type="password" required></label><br/><br/>
+    <button type="submit">Login</button>
+  </form>
+  <p>No account? <a href="signup.html">Sign up</a></p>
+  <script>
+    async function api(path, body){
+      const r = await fetch(path, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        credentials: "include",
+        body: JSON.stringify(body)
+      });
+      if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.error||"error"); }
+      return r.json();
+    }
+    document.getElementById("loginForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      try{
+        await api("/login", { username: fd.get("username"), password: fd.get("password") });
+        alert("Logged in!");
+        window.location.href = "selectreview.html";
+      }catch(err){ alert(err.message); }
+    });
+  </script>
+</body>
+</html>
